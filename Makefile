@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # The MIT License (MIT)
 #
-# Copyright (c) 2015 David Bond
+# Copyright (c) 2015-2016 David Bond
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,9 @@
 SRCS = main
 
 OPTS=-std=c++1y -O3 -DNDEBUG -Wall -Wshadow -Wstrict-aliasing -pedantic \
-		 -Wextra -Werror
+		 -Wextra -Werror  -pthread -I /usr/include
 OPTIMIZE_OPTS+=-fstack-protector-all -g -ggdb3
+OPTIMIZE_OPTS_CC1+=-g
 
 all: clean \
 	output/gcc/def/exe output/gcc/alt/exe \
@@ -33,7 +34,7 @@ all: clean \
 	output/clang/def_opt/exe output/clang/alt_opt/exe
 
 output/gcc/def/%.pre: %.cpp
-	mkdir -p output/gcc/def 
+	mkdir -p output/gcc/def
 	g++ $(OPTS) -E $*.cpp -o output/gcc/def/$*.pre
 output/gcc/def_opt/%.pre: %.cpp
 	mkdir -p output/gcc/def_opt
@@ -84,7 +85,7 @@ output/gcc/alt_opt/%.objdump: output/gcc/alt_opt/%.o
 
 
 output/clang/def/%.pre: %.cpp
-	mkdir -p output/clang/def 
+	mkdir -p output/clang/def
 	clang++ $(OPTS) -E $*.cpp -o output/clang/def/$*.pre
 output/clang/def_opt/%.pre: %.cpp
 	mkdir -p output/clang/def_opt
@@ -96,13 +97,22 @@ output/clang/alt_opt/%.pre: %.cpp
 	mkdir -p output/clang/alt_opt
 	clang++ $(OPTS) $(OPTIMIZE_OPTS) -DALTERNATIVE -E $*.cpp -o output/clang/alt_opt/$*.pre
 
-output/clang/def/%.s: output/clang/def/%.pre
+output/clang/def/%.ast: %.cpp
+	clang++ -cc1 $(OPTS) -ast-dump $*.cpp &> output/clang/def/$*.ast
+output/clang/def_opt/%.ast: %.cpp
+	clang++ -cc1 $(OPTS) -ast-dump $(OPTIMIZE_OPTS_CC1) $*.cpp &> output/clang/def_opt/$*.ast
+output/clang/alt/%.ast: %.cpp
+	clang++ -cc1 $(OPTS) -ast-dump -DALTERNATIVE $*.cpp &> output/clang/alt/$*.ast
+output/clang/alt_opt/%.ast: %.cpp
+	clang++ -cc1 $(OPTS) -ast-dump $(OPTIMIZE_OPTS_CC1) -DALTERNATIVE $*.cpp &> output/clang/alt_opt/$*.ast
+
+output/clang/def/%.s: output/clang/def/%.pre output/clang/def/%.ast
 	clang++ $(OPTS) -S $*.cpp -o output/clang/def/$*.s
-output/clang/def_opt/%.s: output/clang/def_opt/%.pre
+output/clang/def_opt/%.s: output/clang/def_opt/%.pre output/clang/def_opt/%.ast
 	clang++ $(OPTS) $(OPTIMIZE_OPTS) -S $*.cpp -o output/clang/def_opt/$*.s
-output/clang/alt/%.s: output/clang/alt/%.pre
+output/clang/alt/%.s: output/clang/alt/%.pre output/clang/alt/%.ast
 	clang++ $(OPTS) -DALTERNATIVE -S $*.cpp -o output/clang/alt/$*.s
-output/clang/alt_opt/%.s: output/clang/alt_opt/%.pre
+output/clang/alt_opt/%.s: output/clang/alt_opt/%.pre output/clang/alt_opt/%.ast
 	clang++ $(OPTS) $(OPTIMIZE_OPTS) -DALTERNATIVE -S $*.cpp -o output/clang/alt_opt/$*.s
 
 # clang requires -Wno-error=unused-command-line-argument and to start from $*.cpp
@@ -142,6 +152,10 @@ clean:
 	output/gcc/alt/${SRCS}.s output/gcc/alt/${SRCS}.pre \
 	output/gcc/alt_opt/${SRCS}.s output/gcc/alt_opt/${SRCS}.pre \
 	output/clang/def/${SRCS}.s output/clang/def/${SRCS}.pre \
+	output/clang/def/${SRCS}.ast \
 	output/clang/def_opt/${SRCS}.s output/clang/def_opt/${SRCS}.pre \
+	output/clang/def_opt/${SRCS}.ast \
 	output/clang/alt/${SRCS}.s output/clang/alt/${SRCS}.pre \
-	output/clang/alt_opt/${SRCS}.s output/clang/alt_opt/${SRCS}.pre
+	output/clang/alt/${SRCS}.ast \
+	output/clang/alt_opt/${SRCS}.s output/clang/alt_opt/${SRCS}.pre \
+	output/clang/alt_opt/${SRCS}.ast
